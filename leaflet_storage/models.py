@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import hashlib
 import os
 import time
 
@@ -342,6 +343,11 @@ class DataLayer(NamedModel):
     def get_version_path(self, name):
         return '{root}/{name}'.format(root=self.storage_root(), name=name)
 
+    def get_version_md5( self, name ):
+        path = settings.MEDIA_ROOT+self.get_version_path( name )+".gz"
+        with open(path, mode='rb') as f:
+            return hashlib.md5(f.read()).hexdigest()
+    
     def purge_old_versions(self):
         root = self.storage_root()
         names = self.get_versions()[settings.LEAFLET_STORAGE_KEEP_VERSIONS:]

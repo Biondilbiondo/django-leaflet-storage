@@ -524,7 +524,7 @@ class DataLayerUpdate(FormLessEditMixin, GZipMixin, UpdateView):
         request_copy = self.request
 
         #Extract the geojson from the disk
-        f_on_disk = open( self.path()[:-3], "r" )        
+        f_on_disk = open( self.path()[:-3], "r" )
         content_current = f_on_disk.read()
         json_current = json.loads( content_current )
 
@@ -535,18 +535,24 @@ class DataLayerUpdate(FormLessEditMixin, GZipMixin, UpdateView):
         versions = self.object.get_versions()
         if_match = self.request.META.get('HTTP_IF_MATCH')
 
+        edited_version = None
         for i in versions:
             if if_match == self.object.get_version_md5( i ):
-                break;
-        
+                edited_version = if_match
+                break
+
+        if edited_version is None:
+            #If merge can't find the version you started to edit, it can't
+            # do the merge.
+            return False
+
         edited_file = open( settings.MEDIA_ROOT + self.object.get_version_path( i ), "r" )
         content_edited = edited_file.read()
         json_edited = json.loads( content_edited )
-        
+
         json_edited_copy = json.loads( content_edited )
         for i in json_edited_copy['features']:
             equal_to = None
-            
             for j in  json_client['features']:
                 if i == j:
                     equal_to = j
@@ -554,7 +560,7 @@ class DataLayerUpdate(FormLessEditMixin, GZipMixin, UpdateView):
             if equal_to is not None:
                 json_client['features'].remove( equal_to )
                 json_edited['features'].remove( equal_to )
-        
+
         #print("------Merging report------" )
         #Points have been added
         isMergiable = True
@@ -568,22 +574,25 @@ class DataLayerUpdate(FormLessEditMixin, GZipMixin, UpdateView):
                     #print( " \x1b[34mFound in json_current.\x1b[0m" )
                     isFoundInCurrent = True
                     break
-            
+
             #if not isFoundInCurrent:
             #    print( " \x1b[33mNot found in json_current. Can't merge this conflict.\x1b[0m" )
-            
+
             isMergiable = isMergiable and isFoundInCurrent
         #print("--------------------------")
         if isMergiable:
             for k in json_edited['features']:
                 json_current['features'].remove( k )
-            for i in json_client['features']:                                             
+            for i in json_client['features']:
                 json_current['features'].append( i )
+
+            #Overwrite the merged json on the POST request.
             self.request.FILES['geojson'].seek(0)
             self.request.FILES['geojson'].write( bytes( json.dumps( json_current ), 'utf-8') )
             self.request.FILES['geojson'].truncate()
+
         return isMergiable
-    	
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         if self.object.map != self.kwargs['map_inst']:

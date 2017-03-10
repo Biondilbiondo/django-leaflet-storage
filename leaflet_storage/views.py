@@ -532,6 +532,7 @@ class DataLayerUpdate(FormLessEditMixin, GZipMixin, UpdateView):
         content_client = ( request_copy.FILES['geojson'].read() ).decode('utf-8')
         json_client = json.loads( content_client )
 
+        #Extract the geojson that whas loaded in the editing session
         versions = self.object.get_versions()
         if_match = self.request.META.get('HTTP_IF_MATCH')
 
@@ -551,6 +552,7 @@ class DataLayerUpdate(FormLessEditMixin, GZipMixin, UpdateView):
         json_edited = json.loads( content_edited )
 
         json_edited_copy = json.loads( content_edited )
+        #Calculate the diff between the current geojson and the edited one.
         for i in json_edited_copy['features']:
             equal_to = None
             for j in  json_client['features']:
@@ -561,25 +563,16 @@ class DataLayerUpdate(FormLessEditMixin, GZipMixin, UpdateView):
                 json_client['features'].remove( equal_to )
                 json_edited['features'].remove( equal_to )
 
-        #print("------Merging report------" )
-        #Points have been added
+        #Check if the geojson are mergiable.
         isMergiable = True
-        #for i in json_client['features']:
-        #    print( "\x1b[32m", "+++", i['properties']['name'], "\x1b[0m" )
         for j in json_edited['features'] :
-            #print( "\x1b[31m","---", j['properties']['name'], "\x1b[0m", end='' )
             isFoundInCurrent = False
             for k in json_current['features']:
                 if k == j:
-                    #print( " \x1b[34mFound in json_current.\x1b[0m" )
                     isFoundInCurrent = True
                     break
-
-            #if not isFoundInCurrent:
-            #    print( " \x1b[33mNot found in json_current. Can't merge this conflict.\x1b[0m" )
-
             isMergiable = isMergiable and isFoundInCurrent
-        #print("--------------------------")
+
         if isMergiable:
             for k in json_edited['features']:
                 json_current['features'].remove( k )
